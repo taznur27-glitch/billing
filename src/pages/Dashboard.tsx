@@ -64,6 +64,30 @@ export default function Dashboard() {
     return months;
   }, [sales, inventory]);
 
+  
+  const brandSummary = useMemo(() => {
+    const summary: Record<string, { inStock: number; sold: number; value: number }> = {};
+
+    inventory.forEach((item) => {
+      if (!summary[item.brand]) {
+        summary[item.brand] = { inStock: 0, sold: 0, value: 0 };
+      }
+
+      if (item.status === 'In Stock') {
+        summary[item.brand].inStock += 1;
+        summary[item.brand].value += item.purchase_price;
+      }
+
+      if (item.status === 'Sold') {
+        summary[item.brand].sold += 1;
+      }
+    });
+
+    return Object.entries(summary)
+      .sort((a, b) => b[1].inStock - a[1].inStock)
+      .slice(0, 8);
+  }, [inventory]);
+
   const getPartyName = (id?: string | null) => parties.find(p => p.id === id)?.name || '—';
 
   const recentTxns = [...transactions].slice(0, 5);
@@ -165,6 +189,35 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      <Card className="border-border shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Brand-wise Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {brandSummary.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No inventory data available.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {brandSummary.map(([brand, details]) => (
+                <button
+                  key={brand}
+                  type="button"
+                  onClick={() => navigate('/inventory')}
+                  className="text-left rounded-lg border border-border p-3 hover:border-primary/40 hover:bg-accent/30 transition-colors"
+                >
+                  <p className="font-semibold text-sm text-foreground truncate">{brand}</p>
+                  <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                    <p>In Stock: <span className="text-success font-medium">{details.inStock}</span></p>
+                    <p>Sold: <span className="text-foreground font-medium">{details.sold}</span></p>
+                    <p>Stock Value: <span className="text-foreground font-medium">₹{details.value.toLocaleString('en-IN')}</span></p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card className="border-border shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate('/sales')}>

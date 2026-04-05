@@ -58,9 +58,10 @@ export default function Sales() {
   const handleSell = async () => {
     if (!selectedImei || sellingPrice <= 0) { toast.error('Please fill all required fields'); return; }
     try {
-      await addSale.mutateAsync({ imei: selectedImei, customer_id: customerId || null, selling_price: sellingPrice, sale_date: format(saleDate, 'yyyy-MM-dd'), payment_mode: paymentMode, notes: notes || null });
+      const createdSale = await addSale.mutateAsync({ imei: selectedImei, customer_id: customerId || null, selling_price: sellingPrice, sale_date: format(saleDate, 'yyyy-MM-dd'), payment_mode: paymentMode, notes: notes || null });
       toast.success('Sale recorded successfully!');
       setDialogOpen(false); setSelectedImei(''); setSellingPrice(0); setNotes('');
+      handlePrintBill(createdSale);
     } catch (err: any) { toast.error(err.message || 'Failed to record sale'); }
   };
 
