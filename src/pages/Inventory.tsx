@@ -11,7 +11,9 @@ import StatusBadge from '@/components/StatusBadge';
 import PhoneTimeline from '@/components/PhoneTimeline';
 import ExportDialog from '@/components/ExportDialog';
 import PriceListGenerator from '@/components/PriceListGenerator';
+import ImeiScanner from '@/components/ImeiScanner';
 import type { InventoryItem } from '@/hooks/useData';
+import { toast } from 'sonner';
 
 const statusFilters = ['All', 'In Stock', 'Sold', 'Returned'] as const;
 const conditionFilters = ['All', 'New', 'Refurbished', 'Used'] as const;
@@ -70,6 +72,19 @@ export default function Inventory() {
     return items;
   }, [inventory, search, statusFilter, conditionFilter, brandFilter, priceMin, priceMax, sort]);
 
+  const handleImeiScan = (imei: string) => {
+    setSearch(imei);
+    const phone = inventory.find(i => i.imei === imei);
+
+    if (phone) {
+      setSelectedPhone(phone);
+      toast.success(`Found: ${phone.brand} ${phone.model}`);
+      return;
+    }
+
+    toast.info('Scan complete. No exact IMEI match found in inventory.');
+  };
+
   const allExportFields = ['IMEI', 'Brand', 'Model', 'RAM', 'Storage', 'Color', 'Condition', 'Status', 'Purchase Price', 'Purchase Date', 'Source', 'Supplier', 'Warranty', 'Warranty Expiry'];
 
   const exportData = useMemo(() => filtered.map(i => ({
@@ -125,9 +140,12 @@ export default function Inventory() {
       )}
 
       <div className="flex flex-col sm:flex-row gap-3 justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search IMEI, brand, model..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder="Search IMEI, brand, model..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          </div>
+          <ImeiScanner onScan={handleImeiScan} />
         </div>
         <div className="flex gap-2">
           <PriceListGenerator />
