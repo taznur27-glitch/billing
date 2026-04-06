@@ -5,25 +5,54 @@
 dist/
 build/
 lib/
+out/
+.next/
+.nuxt/
 
 # Dependencies
 node_modules/
+vendor/
 
-# IDE files
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Logs
-*.log
-
-# Environment
-.env
-.env.local
-*.env.*
-
 # Coverage
 coverage/
-.nyc_output/
+htmlcov/
+*.coverage
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Python (if applicable)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+nosetests.xml
+.pytest_cache/
+.mypy_cache/
 ```
