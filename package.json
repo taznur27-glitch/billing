@@ -3,15 +3,15 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
+"scripts": {
+  "dev": "vite",
+  "build": "node -e \"const cp=require('child_process');const path=require('path');process.env.BROWSERSLIST_IGNORE_OLD_DATA='true';const viteBin=path.join(path.dirname(require.resolve('vite/package.json')),'bin','vite.js');cp.spawnSync(process.execPath,[viteBin,'build'],{stdio:'inherit',env:process.env});\"",
+    "build:dev": "node -e \"const cp=require('child_process');const path=require('path');process.env.BROWSERSLIST_IGNORE_OLD_DATA='true';const viteBin=path.join(path.dirname(require.resolve('vite/package.json')),'bin','vite.js');cp.spawnSync(process.execPath,[viteBin,'build','--mode','development'],{stdio:'inherit',env:process.env});\"",
+  "lint": "eslint .",
+  "preview": "vite preview",
+  "test": "vitest run",
+  "test:watch": "vitest"
+},
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",

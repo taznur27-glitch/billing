@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Html5Qrcode } from 'html5-qrcode';
 
 interface ImeiScannerProps {
   onScan: (imei: string) => void;
@@ -24,6 +24,7 @@ export default function ImeiScanner({ onScan }: ImeiScannerProps) {
 
   const startScanner = useCallback(async () => {
     try {
+      const { Html5Qrcode } = await import('html5-qrcode');
       const scanner = new Html5Qrcode('imei-scanner-region');
       scannerRef.current = scanner;
       setScanning(true);
