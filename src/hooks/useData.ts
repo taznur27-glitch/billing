@@ -61,6 +61,21 @@ export function useInventory() {
     queryKey: ['inventory'],
     queryFn: async () => {
       const { data, error } = await supabase.from('inventory').select('*').order('created_at', { ascending: false });
+
+       if (error?.message?.includes("Could not find the 'storage' column")) {
+        const fallback = await supabase
+          .from('inventory')
+          .select('id, imei, brand, model, color, condition, purchase_source, purchase_price, purchase_date, supplier_id, status, warranty_status, warranty_expiry, notes, photo_url, created_at')
+          .order('created_at', { ascending: false });
+
+        if (fallback.error) throw fallback.error;
+        return (fallback.data ?? []).map((item: any) => ({
+          ...item,
+          ram: '—',
+          storage: '—',
+        })) as InventoryItem[];
+      }
+
       if (error) throw error;
       return data as InventoryItem[];
     },
@@ -75,7 +90,15 @@ export function useAddInventory() {
       const { data: existing } = await supabase.from('inventory').select('imei').eq('imei', item.imei).maybeSingle();
       if (existing) throw new Error('This IMEI already exists in inventory');
 
-      const { data, error } = await supabase.from('inventory').insert(item).select().single();
+      let { data, error } = await supabase.from('inventory').insert(item).select().single();
+
+      if (error?.message?.includes("Could not find the 'storage' column")) {
+        const { storage, ram, ...legacyItem } = item as any;
+        const fallbackInsert = await supabase.from('inventory').insert(legacyItem).select().single();
+        data = fallbackInsert.data;
+        error = fallbackInsert.error;
+      }
+
       if (error) throw error;
 
       // Auto-create Purchase transaction
