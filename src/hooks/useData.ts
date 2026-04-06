@@ -9,6 +9,9 @@ export type Sale = Tables<'sales'>;
 export type ReturnRecord = Tables<'returns'>;
 export type Transaction = Tables<'transactions'>;
 
+const isMissingTransactionsTable = (message?: string) =>
+  !!message?.includes("Could not find the table 'public.transactions'");
+
 // ---- Helpers ----
 export function getStockAgeDays(purchaseDate: string): number {
   return Math.floor((Date.now() - new Date(purchaseDate).getTime()) / 86400000);
@@ -62,7 +65,7 @@ export function useInventory() {
     queryFn: async () => {
       const { data, error } = await supabase.from('inventory').select('*').order('created_at', { ascending: false });
 
-       const missingStorage = error?.message?.includes("Could not find the 'storage' column");
+      const missingStorage = error?.message?.includes("Could not find the 'storage' column");
       const missingSupplier = error?.message?.includes("Could not find the 'supplier_id' column");
 
       if (missingStorage || missingSupplier) {
@@ -109,13 +112,16 @@ export function useAddInventory() {
       if (error) throw error;
 
       // Auto-create Purchase transaction
-      await supabase.from('transactions').insert({
+      const purchaseTxn = await supabase.from('transactions').insert({
         type: 'Purchase',
         imei: item.imei,
         party_id: item.supplier_id || null,
         txn_date: item.purchase_date,
         amount: item.purchase_price,
       });
+      if (purchaseTxn.error && !isMissingTransactionsTable(purchaseTxn.error.message)) {
+        throw purchaseTxn.error;
+      }
 
       return data;
     },
@@ -139,6 +145,7 @@ export function useSales() {
           .eq('type', 'Sale')
           .order('txn_date', { ascending: false });
 
+        if (fallback.error && isMissingTransactionsTable(fallback.error.message)) return [];
         if (fallback.error) throw fallback.error;
         return (fallback.data ?? []).map((t: any) => ({
           id: t.id,
@@ -174,7 +181,20 @@ export function useAddSale() {
           notes: sale.notes || null,
         }).select().single();
 
-        if (fallbackTxn.error) throw fallbackTxn.error;
+        if (fallbackTxn.error && !isMissingTransactionsTable(fallbackTxn.error.message)) throw fallbackTxn.error;
+
+        if (!fallbackTxn.data) {
+          return {
+            id: crypto.randomUUID(),
+            imei: sale.imei,
+            customer_id: sale.customer_id || null,
+            selling_price: sale.selling_price,
+            sale_date: sale.sale_date,
+            payment_mode: sale.payment_mode || 'Cash',
+            notes: sale.notes || null,
+            created_at: new Date().toISOString(),
+          } as Sale;
+        }
 
         return {
           id: fallbackTxn.data.id,
@@ -194,13 +214,16 @@ export function useAddSale() {
       await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
 
       // Auto-create Sale transaction
-      await supabase.from('transactions').insert({
+      const saleTxn = await supabase.from('transactions').insert({
         type: 'Sale',
         imei: sale.imei,
         party_id: sale.customer_id || null,
         txn_date: sale.sale_date,
         amount: sale.selling_price,
       });
+      if (saleTxn.error && !isMissingTransactionsTable(saleTxn.error.message)) {
+        throw saleTxn.error;
+      }
 
       return data;
     },
@@ -235,13 +258,16 @@ export function useAddReturn() {
       await supabase.from('inventory').update({ status: 'Returned' }).eq('imei', ret.imei);
 
       // Auto-create return transaction
-      await supabase.from('transactions').insert({
+      const returnTxn = await supabase.from('transactions').insert({
         type: ret.return_type === 'Sales Return' ? 'Sales Return' : 'Purchase Return',
         imei: ret.imei,
         party_id: ret.party_id || null,
         txn_date: ret.return_date,
         amount: ret.amount_refunded || 0,
       });
+      if (returnTxn.error && !isMissingTransactionsTable(returnTxn.error.message)) {
+        throw returnTxn.error;
+      }
 
       return data;
     },
@@ -259,6 +285,7 @@ export function useTransactions() {
     queryKey: ['transactions'],
     queryFn: async () => {
       const { data, error } = await supabase.from('transactions').select('*').order('txn_date', { ascending: false });
+      if (error && isMissingTransactionsTable(error.message)) return [];
       if (error) throw error;
       return data as Transaction[];
     },
