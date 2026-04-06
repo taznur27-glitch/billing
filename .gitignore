@@ -1,4 +1,29 @@
-* text=auto eol=lf
-*.bat text eol=crlf
-*.cmd text eol=crlf
-node_modules
+```
+# TypeScript/JavaScript build artifacts
+*.js.map
+*.tsbuildinfo
+dist/
+build/
+lib/
+
+# Dependencies
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Coverage
+coverage/
+.nyc_output/
+```
