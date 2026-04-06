@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { PostgrestError } from '@supabase/supabase-js';
 
 // ---- Types ----
 export type Party = Tables<'parties'>;
@@ -11,6 +12,10 @@ export type Transaction = Tables<'transactions'>;
 
 const isMissingTransactionsTable = (message?: string) =>
   !!message?.includes("Could not find the table 'public.transactions'");
+const isMissingSalesTable = (message?: string) =>
+  !!message?.includes("Could not find the table 'public.sales'");
+const isMissingColumnError = (message?: string) =>
+  !!message?.includes("Could not find the '") && !!message?.includes("' column");
 
 // ---- Helpers ----
 export function getStockAgeDays(purchaseDate: string): number {
@@ -137,8 +142,15 @@ export function useSales() {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sales').select('*').order('sale_date', { ascending: false });
-      if (error?.message?.includes("Could not find the table 'public.sales'")) {
+      let { data, error } = await supabase.from('sales').select('*').order('sale_date', { ascending: false });
+
+      if (error && isMissingColumnError(error.message)) {
+        const fallbackSales = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+        data = fallbackSales.data;
+        error = fallbackSales.error;
+      }
+
+      if (error && isMissingSalesTable(error.message)) {
         const fallback = await supabase
           .from('transactions')
           .select('*')
@@ -147,7 +159,7 @@ export function useSales() {
 
         if (fallback.error && isMissingTransactionsTable(fallback.error.message)) return [];
         if (fallback.error) throw fallback.error;
-        return (fallback.data ?? []).map((t: any) => ({
+        return (fallback.data ?? []).map((t) => ({
           id: t.id,
           imei: t.imei ?? '',
           customer_id: t.party_id,
@@ -168,10 +180,38 @@ export function useAddSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (sale: TablesInsert<'sales'>) => {
-      let { data, error } = await supabase.from('sales').insert(sale).select().single();
+      let saleData: Sale | null = null;
+      let saleInsertError: PostgrestError | null = null;
 
-      if (error?.message?.includes("Could not find the table 'public.sales'")) {
-        await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+      const saleInsertResult = await supabase.from('sales').insert(sale).select().single();
+      let data = saleInsertResult.data;
+      let error = saleInsertResult.error;
+
+      if (!error) {
+        saleData = data as Sale;
+      }
+
+      if (error && isMissingColumnError(error.message)) {
+        const minimalSalePayload = {
+          imei: sale.imei,
+          selling_price: sale.selling_price,
+          sale_date: sale.sale_date,
+          customer_id: sale.customer_id || null,
+        };
+        const fallbackSale = await supabase
+          .from('sales')
+          .insert(minimalSalePayload as TablesInsert<'sales'>)
+          .select()
+          .single();
+        if (!fallbackSale.error) {
+          saleData = fallbackSale.data as Sale;
+          error = null;
+        } else {
+          error = fallbackSale.error;
+        }
+      }
+
+      if (error && isMissingSalesTable(error.message)) {
         const fallbackTxn = await supabase.from('transactions').insert({
           type: 'Sale',
           imei: sale.imei,
@@ -181,9 +221,34 @@ export function useAddSale() {
           notes: sale.notes || null,
         }).select().single();
 
+        if (fallbackTxn.error && isMissingColumnError(fallbackTxn.error.message)) {
+          const minimalTxn = await supabase.from('transactions').insert({
+            type: 'Sale',
+            imei: sale.imei,
+            txn_date: sale.sale_date,
+            amount: sale.selling_price,
+          } as TablesInsert<'transactions'>).select().single();
+
+          if (!minimalTxn.error) {
+            await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+            return {
+              id: minimalTxn.data.id,
+              imei: sale.imei,
+              customer_id: sale.customer_id || null,
+              selling_price: sale.selling_price,
+              sale_date: sale.sale_date,
+              payment_mode: sale.payment_mode || 'Cash',
+              notes: sale.notes || null,
+              created_at: minimalTxn.data.created_at || null,
+            } as Sale;
+          }
+          if (minimalTxn.error && !isMissingTransactionsTable(minimalTxn.error.message)) throw minimalTxn.error;
+        }
+
         if (fallbackTxn.error && !isMissingTransactionsTable(fallbackTxn.error.message)) throw fallbackTxn.error;
 
         if (!fallbackTxn.data) {
+          await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
           return {
             id: crypto.randomUUID(),
             imei: sale.imei,
@@ -196,6 +261,7 @@ export function useAddSale() {
           } as Sale;
         }
 
+        await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
         return {
           id: fallbackTxn.data.id,
           imei: sale.imei,
@@ -208,24 +274,54 @@ export function useAddSale() {
         } as Sale;
       }
 
-      if (error) throw error;
+      if (error) saleInsertError = error;
 
-      // Auto-update inventory status to 'Sold'
       await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
 
-      // Auto-create Sale transaction
-      const saleTxn = await supabase.from('transactions').insert({
+      const txnPayload = {
         type: 'Sale',
         imei: sale.imei,
         party_id: sale.customer_id || null,
         txn_date: sale.sale_date,
         amount: sale.selling_price,
-      });
+        notes: sale.notes || null,
+      };
+
+      let saleTxn = await supabase.from('transactions').insert(txnPayload).select().single();
+      if (saleTxn.error && isMissingColumnError(saleTxn.error.message)) {
+        saleTxn = await supabase
+          .from('transactions')
+          .insert({
+            type: 'Sale',
+            imei: sale.imei,
+            txn_date: sale.sale_date,
+            amount: sale.selling_price,
+          } as TablesInsert<'transactions'>)
+          .select()
+          .single();
+      }
       if (saleTxn.error && !isMissingTransactionsTable(saleTxn.error.message)) {
-        throw saleTxn.error;
+        if (!saleData) {
+          throw saleTxn.error;
+        }
       }
 
-      return data;
+      if (!saleData && saleTxn.data) {
+        return {
+          id: saleTxn.data.id,
+          imei: sale.imei,
+          customer_id: sale.customer_id || null,
+          selling_price: sale.selling_price,
+          sale_date: sale.sale_date,
+          payment_mode: sale.payment_mode || 'Cash',
+          notes: sale.notes || null,
+          created_at: saleTxn.data.created_at || null,
+        } as Sale;
+      }
+
+      if (!saleData && saleInsertError) throw saleInsertError;
+
+      return saleData as Sale;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] });
