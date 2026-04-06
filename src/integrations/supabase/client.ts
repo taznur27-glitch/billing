@@ -12,7 +12,7 @@ const SUPABASE_PUBLISHABLE_KEY =
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   throw new Error(
-    'Missing Supabase env values. Set VITE_SUPABASE_URL (or VITE_SUPABASE_PROJECT_ID) and VITE_SUPABASE_PUBLISHABLE_KEY in .env',
+    'Missing Supabase env values. In .env use VITE_SUPABASE_URL (or VITE_SUPABASE_PROJECT_ID) and VITE_SUPABASE_PUBLISHABLE_KEY. Variable names must use underscores (example: VITE_SUPABASE_URL=...)',
   );
 }
 // Import the supabase client like this:
