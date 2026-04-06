@@ -132,6 +132,25 @@ export function useSales() {
     queryKey: ['sales'],
     queryFn: async () => {
       const { data, error } = await supabase.from('sales').select('*').order('sale_date', { ascending: false });
+      if (error?.message?.includes("Could not find the table 'public.sales'")) {
+        const fallback = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('type', 'Sale')
+          .order('txn_date', { ascending: false });
+
+        if (fallback.error) throw fallback.error;
+        return (fallback.data ?? []).map((t: any) => ({
+          id: t.id,
+          imei: t.imei ?? '',
+          customer_id: t.party_id,
+          selling_price: t.amount ?? 0,
+          sale_date: t.txn_date,
+          payment_mode: 'Cash',
+          notes: t.notes ?? null,
+          created_at: t.created_at ?? null,
+        })) as Sale[];
+      }
       if (error) throw error;
       return data as Sale[];
     },
@@ -142,7 +161,33 @@ export function useAddSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (sale: TablesInsert<'sales'>) => {
-      const { data, error } = await supabase.from('sales').insert(sale).select().single();
+      let { data, error } = await supabase.from('sales').insert(sale).select().single();
+
+      if (error?.message?.includes("Could not find the table 'public.sales'")) {
+        await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+        const fallbackTxn = await supabase.from('transactions').insert({
+          type: 'Sale',
+          imei: sale.imei,
+          party_id: sale.customer_id || null,
+          txn_date: sale.sale_date,
+          amount: sale.selling_price,
+          notes: sale.notes || null,
+        }).select().single();
+
+        if (fallbackTxn.error) throw fallbackTxn.error;
+
+        return {
+          id: fallbackTxn.data.id,
+          imei: sale.imei,
+          customer_id: sale.customer_id || null,
+          selling_price: sale.selling_price,
+          sale_date: sale.sale_date,
+          payment_mode: sale.payment_mode || 'Cash',
+          notes: sale.notes || null,
+          created_at: fallbackTxn.data.created_at || null,
+        } as Sale;
+      }
+
       if (error) throw error;
 
       // Auto-update inventory status to 'Sold'
