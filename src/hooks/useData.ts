@@ -10,10 +10,16 @@ export type Sale = Tables<'sales'>;
 export type ReturnRecord = Tables<'returns'>;
 export type Transaction = Tables<'transactions'>;
 
-const isMissingTransactionsTable = (message?: string) =>
-  !!message?.includes("Could not find the table 'public.transactions'");
-const isMissingSalesTable = (message?: string) =>
-  !!message?.includes("Could not find the table 'public.sales'");
+const isMissingTableError = (message?: string, table?: string) => {
+  if (!message || !table) return false;
+  const lower = message.toLowerCase();
+  return (
+    (lower.includes('could not find the table') && lower.includes(table.toLowerCase())) ||
+    (lower.includes('relation') && lower.includes(table.toLowerCase()) && lower.includes('does not exist'))
+  );
+};
+const isMissingTransactionsTable = (message?: string) => isMissingTableError(message, 'public.transactions');
+const isMissingSalesTable = (message?: string) => isMissingTableError(message, 'public.sales');
 const isMissingColumnError = (message?: string) =>
   !!message?.includes("Could not find the '") && !!message?.includes("' column");
 
