@@ -1,0 +1,1 @@
+import{f as e}from"./index-B7FzFS-C.js";const s="https://ybvvrkvglrkmyfxxjemf.supabase.co",t="sb_publishable_EzL9eTe1QxqChUnvSvteOA_G-h9pMXf",o=e(s,t,{auth:{storage:localStorage,persistSession:!0,autoRefreshToken:!0}});export{o as s};

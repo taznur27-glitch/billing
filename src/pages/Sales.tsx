@@ -52,6 +52,7 @@ export default function Sales() {
     const item = inventory.find(i => i.imei === imei);
     return item ? sellingPrice - item.purchase_price : 0;
   };
+  const getImeiTail = (imei: unknown, digits = 6) => String(imei ?? '').slice(-digits) || '—';
   const getPartyName = (id?: string | null) => parties.find(p => p.id === id)?.name || '—';
   const totalProfit = sales.reduce((sum, s) => sum + getProfit(s.imei, s.selling_price), 0);
 
@@ -126,8 +127,8 @@ export default function Sales() {
                           <SelectItem value="__none" disabled>No in-stock phones found</SelectItem>
                         ) : (
                           inStockPhones.map(p => (
-                            <SelectItem key={p.imei} value={p.imei}>
-                              {p.brand} {p.model} — ₹{p.purchase_price.toLocaleString('en-IN')} ({p.imei.slice(-6)})
+                            <SelectItem key={String(p.imei)} value={String(p.imei)}>
+                              {p.brand} {p.model} — ₹{p.purchase_price.toLocaleString('en-IN')} ({getImeiTail(p.imei, 6)})
                             </SelectItem>
                           ))
                         )}
@@ -209,7 +210,7 @@ export default function Sales() {
                     const profit = getProfit(s.imei, s.selling_price);
                     return (
                       <tr key={s.id} className="border-b border-border/50">
-                        <td className="py-3 px-4 font-mono-imei">{s.imei.slice(-8)}</td>
+                        <td className="py-3 px-4 font-mono-imei">{getImeiTail(s.imei, 8)}</td>
                         <td className="py-3 px-4">{item ? `${item.brand} ${item.model}` : '—'}</td>
                         <td className="py-3 px-4 text-muted-foreground">{getPartyName(s.customer_id)}</td>
                         <td className="py-3 px-4 text-right price-text">₹{s.selling_price.toLocaleString('en-IN')}</td>
