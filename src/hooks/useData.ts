@@ -62,10 +62,13 @@ export function useInventory() {
     queryFn: async () => {
       const { data, error } = await supabase.from('inventory').select('*').order('created_at', { ascending: false });
 
-       if (error?.message?.includes("Could not find the 'storage' column")) {
+       const missingStorage = error?.message?.includes("Could not find the 'storage' column");
+      const missingSupplier = error?.message?.includes("Could not find the 'supplier_id' column");
+
+      if (missingStorage || missingSupplier) {
         const fallback = await supabase
           .from('inventory')
-          .select('id, imei, brand, model, color, condition, purchase_source, purchase_price, purchase_date, supplier_id, status, warranty_status, warranty_expiry, notes, photo_url, created_at')
+          .select('id, imei, brand, model, color, condition, purchase_source, purchase_price, purchase_date, status, warranty_status, warranty_expiry, notes, photo_url, created_at')
           .order('created_at', { ascending: false });
 
         if (fallback.error) throw fallback.error;
@@ -73,6 +76,7 @@ export function useInventory() {
           ...item,
           ram: '—',
           storage: '—',
+          supplier_id: null,
         })) as InventoryItem[];
       }
 
@@ -92,8 +96,11 @@ export function useAddInventory() {
 
       let { data, error } = await supabase.from('inventory').insert(item).select().single();
 
-      if (error?.message?.includes("Could not find the 'storage' column")) {
-        const { storage, ram, ...legacyItem } = item as any;
+      const missingStorage = error?.message?.includes("Could not find the 'storage' column");
+      const missingSupplier = error?.message?.includes("Could not find the 'supplier_id' column");
+
+      if (missingStorage || missingSupplier) {
+        const { storage, ram, supplier_id, ...legacyItem } = item as any;
         const fallbackInsert = await supabase.from('inventory').insert(legacyItem).select().single();
         data = fallbackInsert.data;
         error = fallbackInsert.error;
