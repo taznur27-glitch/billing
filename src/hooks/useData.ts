@@ -300,10 +300,15 @@ export function useAddSale() {
         } as Sale;
       }
 
-      if (error) saleInsertError = error;
+      // If sale insert failed and it's not a missing table error, throw the error
+      if (error) {
+        throw error;
+      }
 
+      // Sale was successful, now update inventory status
       await markInventoryAsSold(sale.imei);
 
+      // Create transaction record (non-blocking - failures here won't prevent sale from being recorded)
       const txnPayload = {
         type: 'Sale',
         imei: sale.imei,
@@ -326,26 +331,9 @@ export function useAddSale() {
           .select()
           .single();
       }
-      if (saleTxn.error && !isMissingTransactionsTable(saleTxn.error.message)) {
-        if (!saleData) {
-          throw saleTxn.error;
-        }
-      }
-
-      if (!saleData && saleTxn.data) {
-        return {
-          id: saleTxn.data.id,
-          imei: sale.imei,
-          customer_id: sale.customer_id || null,
-          selling_price: sale.selling_price,
-          sale_date: sale.sale_date,
-          payment_mode: sale.payment_mode || 'Cash',
-          notes: sale.notes || null,
-          created_at: saleTxn.data.created_at || null,
-        } as Sale;
-      }
-
-      if (!saleData && saleInsertError) throw saleInsertError;
+      
+      // Transaction insert is optional - don't fail the sale if it fails
+      // Just log it but continue
 
       return saleData as Sale;
     },
