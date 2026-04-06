@@ -23,6 +23,26 @@ const isMissingSalesTable = (message?: string) => isMissingTableError(message, '
 const isMissingColumnError = (message?: string) =>
   !!message?.includes("Could not find the '") && !!message?.includes("' column");
 
+const markInventoryAsSold = async (imei: string) => {
+  const updateResult = await supabase
+    .from('inventory')
+    .update({ status: 'Sold' })
+    .eq('imei', imei)
+    .select('id');
+
+  if (!updateResult.error) return;
+
+  const missingStatusColumn =
+    updateResult.error.message.includes("Could not find the 'status' column") ||
+    updateResult.error.message.includes('column inventory.status does not exist');
+
+  if (!missingStatusColumn) throw updateResult.error;
+
+  // Legacy fallback: if no status column exists, deduct from stock by removing sold row.
+  const deleteResult = await supabase.from('inventory').delete().eq('imei', imei).select('id');
+  if (deleteResult.error) throw deleteResult.error;
+};
+
 // ---- Helpers ----
 export function getStockAgeDays(purchaseDate: string): number {
   return Math.floor((Date.now() - new Date(purchaseDate).getTime()) / 86400000);
@@ -236,7 +256,7 @@ export function useAddSale() {
           } as TablesInsert<'transactions'>).select().single();
 
           if (!minimalTxn.error) {
-            await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+            await markInventoryAsSold(sale.imei);
             return {
               id: minimalTxn.data.id,
               imei: sale.imei,
@@ -254,7 +274,7 @@ export function useAddSale() {
         if (fallbackTxn.error && !isMissingTransactionsTable(fallbackTxn.error.message)) throw fallbackTxn.error;
 
         if (!fallbackTxn.data) {
-          await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+          await markInventoryAsSold(sale.imei);
           return {
             id: crypto.randomUUID(),
             imei: sale.imei,
@@ -267,7 +287,7 @@ export function useAddSale() {
           } as Sale;
         }
 
-        await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+        await markInventoryAsSold(sale.imei);
         return {
           id: fallbackTxn.data.id,
           imei: sale.imei,
@@ -282,7 +302,7 @@ export function useAddSale() {
 
       if (error) saleInsertError = error;
 
-      await supabase.from('inventory').update({ status: 'Sold' }).eq('imei', sale.imei);
+      await markInventoryAsSold(sale.imei);
 
       const txnPayload = {
         type: 'Sale',
