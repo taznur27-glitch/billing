@@ -23,11 +23,11 @@ const isMissingSalesTable = (message?: string) => isMissingTableError(message, '
 const isMissingColumnError = (message?: string) =>
   !!message?.includes("Could not find the '") && !!message?.includes("' column");
 
-const markInventoryAsSold = async (imei: string) => {
+const markInventoryAsSold = async (inventory_id: string) => {
   const updateResult = await supabase
     .from('inventory')
     .update({ status: 'Sold' })
-    .eq('imei', imei)
+    .eq('id', inventory_id)
     .select('id');
 
   if (!updateResult.error) return;
@@ -256,7 +256,7 @@ export function useAddSale() {
           } as TablesInsert<'transactions'>).select().single();
 
           if (!minimalTxn.error) {
-            await markInventoryAsSold(sale.imei);
+            await markInventoryAsSold(sale.inventory_id);
             return {
               id: minimalTxn.data.id,
               imei: sale.imei,
@@ -274,7 +274,7 @@ export function useAddSale() {
         if (fallbackTxn.error && !isMissingTransactionsTable(fallbackTxn.error.message)) throw fallbackTxn.error;
 
         if (!fallbackTxn.data) {
-          await markInventoryAsSold(sale.imei);
+          await markInventoryAsSold(sale.inventory_id);
           return {
             id: crypto.randomUUID(),
             imei: sale.imei,
@@ -287,7 +287,7 @@ export function useAddSale() {
           } as Sale;
         }
 
-        await markInventoryAsSold(sale.imei);
+        await markInventoryAsSold(sale.inventory_id);
         return {
           id: fallbackTxn.data.id,
           imei: sale.imei,
@@ -306,7 +306,7 @@ export function useAddSale() {
       }
 
       // Sale was successful, now update inventory status
-      await markInventoryAsSold(sale.imei);
+      await markInventoryAsSold(sale.inventory_id);
 
       // Create transaction record (non-blocking - failures here won't prevent sale from being recorded)
 
