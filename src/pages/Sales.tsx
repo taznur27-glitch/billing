@@ -37,7 +37,13 @@ export default function Sales() {
   const [billSale, setBillSale] = useState<Sale | null>(null);
   const billRef = useRef<HTMLDivElement>(null);
 
-  const inStockPhones = inventory.filter(i => i.status === 'In Stock');
+  const isInStock = (status?: string | null) => {
+    if (!status) return true;
+    const normalized = status.toLowerCase().replace(/[_\s-]/g, '');
+    return normalized === 'instock';
+  };
+
+  const inStockPhones = inventory.filter(i => isInStock(i.status));
   const selectedPhone = selectedImei ? inventory.find(i => i.imei === selectedImei) : null;
   const profitPreview = selectedPhone ? sellingPrice - selectedPhone.purchase_price : 0;
   const customers = parties.filter(p => p.type === 'Customer' || p.type === 'Dealer');
@@ -115,7 +121,17 @@ export default function Sales() {
                   <div className="flex gap-2 mt-1">
                     <Select value={selectedImei} onValueChange={setSelectedImei}>
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Select in-stock phone" /></SelectTrigger>
-                      <SelectContent>{inStockPhones.map(p => (<SelectItem key={p.imei} value={p.imei}>{p.brand} {p.model} — ₹{p.purchase_price.toLocaleString('en-IN')} ({p.imei.slice(-6)})</SelectItem>))}</SelectContent>
+                      <SelectContent>
+                        {inStockPhones.length === 0 ? (
+                          <SelectItem value="__none" disabled>No in-stock phones found</SelectItem>
+                        ) : (
+                          inStockPhones.map(p => (
+                            <SelectItem key={p.imei} value={p.imei}>
+                              {p.brand} {p.model} — ₹{p.purchase_price.toLocaleString('en-IN')} ({p.imei.slice(-6)})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
                     </Select>
                     <ImeiScanner onScan={handleImeiScan} />
                   </div>
