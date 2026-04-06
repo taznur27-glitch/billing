@@ -9,8 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, DollarSign, ShoppingCart, Printer } from 'lucide-react';
+import { CalendarIcon, DollarSign, ShoppingCart, Printer, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
+import { jsPDF } from 'jspdf';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useInventory, useSales, useParties, useAddSale } from '@/hooks/useData';
@@ -35,6 +36,7 @@ export default function Sales() {
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [notes, setNotes] = useState('');
   const [billSale, setBillSale] = useState<Sale | null>(null);
+  const [billDialogOpen, setBillDialogOpen] = useState(false);
   const billRef = useRef<HTMLDivElement>(null);
 
   const isInStock = (status?: string | null) => {
@@ -68,20 +70,43 @@ export default function Sales() {
       const createdSale = await addSale.mutateAsync({ imei: selectedImei, customer_id: customerId || null, selling_price: sellingPrice, sale_date: format(saleDate, 'yyyy-MM-dd'), payment_mode: paymentMode, notes: notes || null });
       toast.success('Sale recorded successfully!');
       setDialogOpen(false); setSelectedImei(''); setSellingPrice(0); setNotes('');
-      handlePrintBill(createdSale);
+      setBillSale(createdSale);
+      setBillDialogOpen(true);
     } catch (err: any) { toast.error(err.message || 'Failed to record sale'); }
   };
 
-  const handlePrintBill = (sale: Sale) => {
+  const openBillPreview = (sale: Sale) => {
     setBillSale(sale);
-    setTimeout(() => {
-      const printContent = billRef.current;
-      if (!printContent) return;
-      const win = window.open('', '_blank');
-      if (!win) { toast.error('Please allow popups'); return; }
-      win.document.write(`<html><head><title>Invoice</title><style>body{margin:0;padding:20px;font-family:Georgia,serif}table{border-collapse:collapse;width:100%}th,td{padding:8px}@media print{body{padding:0}}</style></head><body>${printContent.innerHTML}</body></html>`);
-      win.document.close(); win.print(); setBillSale(null);
-    }, 100);
+    setBillDialogOpen(true);
+  };
+
+  const handlePrintBill = () => {
+    const printContent = billRef.current;
+    if (!printContent) return;
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('Please allow popups'); return; }
+    win.document.write(`<html><head><title>Invoice</title><style>body{margin:0;padding:18px;font-family:'Times New Roman',serif;background:#fff}table{border-collapse:collapse;width:100%}th,td{padding:0}@media print{body{padding:0}}</style></head><body>${printContent.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    const printContent = billRef.current;
+    if (!printContent || !billSale) return;
+    try {
+      const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      await doc.html(printContent, {
+        x: 18,
+        y: 18,
+        width: 559,
+        windowWidth: 794,
+      });
+      doc.save(`invoice-${billSale.id.slice(0, 8)}.pdf`);
+      toast.success('Invoice PDF downloaded');
+    } catch {
+      toast.error('Unable to download PDF');
+    }
   };
 
   const allSalesFields = ['IMEI', 'Phone', 'Customer', 'Selling Price', 'Profit', 'Date', 'Payment'];
@@ -218,7 +243,7 @@ export default function Sales() {
                         <td className="py-3 px-4 text-muted-foreground">{s.sale_date}</td>
                         <td className="py-3 px-4"><StatusBadge status={s.payment_mode} /></td>
                         <td className="py-3 px-4 text-center">
-                          <Button variant="ghost" size="icon" onClick={() => handlePrintBill(s)} title="Print Bill"><Printer className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => openBillPreview(s)} title="Open Bill"><Printer className="w-4 h-4" /></Button>
                         </td>
                       </tr>
                     );
@@ -231,9 +256,22 @@ export default function Sales() {
       )}
 
       {billSale && (
-        <div className="fixed -left-[9999px]">
-          <SaleBill ref={billRef} sale={billSale} phone={inventory.find(i => i.imei === billSale.imei)} customer={parties.find(p => p.id === billSale.customer_id)} />
-        </div>
+        <>
+          <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
+            <DialogContent className="max-w-[880px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Invoice Preview</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={handlePrintBill}><Printer className="w-4 h-4 mr-2" />Print</Button>
+                <Button size="sm" variant="secondary" onClick={handleDownloadPdf}><FileDown className="w-4 h-4 mr-2" />Export PDF</Button>
+              </div>
+              <div className={cn('rounded-md bg-muted/20 overflow-auto p-2 border')}>
+                <SaleBill ref={billRef} sale={billSale} phone={inventory.find(i => i.imei === billSale.imei)} customer={parties.find(p => p.id === billSale.customer_id)} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
     </div>
   );
