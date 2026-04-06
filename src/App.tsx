@@ -1,18 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import Layout from "@/components/Layout";
-import Dashboard from "@/pages/Dashboard";
-import Inventory from "@/pages/Inventory";
-import AddPhone from "@/pages/AddPhone";
-import Sales from "@/pages/Sales";
-import Parties from "@/pages/Parties";
-import Returns from "@/pages/Returns";
-import Transactions from "@/pages/Transactions";
-import Admin from "@/pages/Admin";
-import ResetPassword from "@/pages/ResetPassword";
-import NotFound from "@/pages/NotFound";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster as Sonner } from "./components/ui/sonner";
+import { TooltipProvider } from "./components/ui/tooltip";
+import Layout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import Inventory from "./pages/Inventory";
+import AddPhone from "./pages/AddPhone";
+import Sales from "./pages/Sales";
+import Parties from "./pages/Parties";
+import Returns from "./pages/Returns";
+import Transactions from "./pages/Transactions";
+import Admin from "./pages/Admin";
+import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
