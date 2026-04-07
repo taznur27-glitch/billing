@@ -264,8 +264,7 @@ export function useAddSale() {
               selling_price: sale.selling_price,
               sale_date: sale.sale_date,
               payment_mode: sale.payment_mode || 'Cash',
-              notes: sale.notes || null,
-              created_at: minimalTxn.data.created_at || null,
+              notes: sale.notes || null,  
             } as Sale;
           }
           if (minimalTxn.error && !isMissingTransactionsTable(minimalTxn.error.message)) throw minimalTxn.error;
