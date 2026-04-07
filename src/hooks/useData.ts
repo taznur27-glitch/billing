@@ -23,14 +23,19 @@ const isMissingSalesTable = (message?: string) => isMissingTableError(message, '
 const isMissingColumnError = (message?: string) =>
   !!message?.includes("Could not find the '") && !!message?.includes("' column");
 
-const markInventoryAsSold = async (inventory_id: string) => {
+const markInventoryAsSold = async (imei: string) => {
   const updateResult = await supabase
     .from('inventory')
     .update({ status: 'Sold' })
     .eq('id', inventory_id)
     .select('id');
 
-  if (!updateResult.error) return;
+  if (!updateResult.error) {
+    console.log('[DEBUG] Successfully marked as Sold:', updateResult.data);
+    return;
+  }
+
+  console.error('[DEBUG] Update error:', updateResult.error);
 
   const missingStatusColumn =
     updateResult.error.message.includes("Could not find the 'status' column") ||
@@ -41,6 +46,7 @@ const markInventoryAsSold = async (inventory_id: string) => {
   // Legacy fallback: if no status column exists, deduct from stock by removing sold row.
   const deleteResult = await supabase.from('inventory').delete().eq('imei', imei).select('id');
   if (deleteResult.error) throw deleteResult.error;
+  console.log('[DEBUG] Legacy fallback: deleted inventory item');
 };
 
 // ---- Helpers ----
